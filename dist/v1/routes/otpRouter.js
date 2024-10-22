@@ -25,7 +25,7 @@ otpRouter.use(express_1.default.json());
 const prisma = new client_1.PrismaClient();
 const otpSchema = zod_1.default.object({
     mobileNumber: zod_1.default.string().min(10, "mobile number cannot be less than 10 digits").max(10, "mobile number cannot be more than 10 digits"),
-    countryCode: zod_1.default.string().min(1).max(3),
+    countryCode: zod_1.default.string().min(2).max(4),
 });
 const verifyOtpSchema = zod_1.default.object({
     mobileNumber: zod_1.default.string().min(10, "mobile number cannot be less than 10 digits").max(10, "mobile number cannot be more than 10 digits"),
@@ -36,6 +36,18 @@ otpRouter.post('/send-otp', (req, res) => __awaiter(void 0, void 0, void 0, func
         const otpData = otpSchema.safeParse(req.body);
         if (!otpData.success) {
             res.status(400).send(otpData.error.errors);
+            return;
+        }
+        const existPhoneNum = yield prisma.user.findFirst({
+            where: {
+                mobileNumber: otpData.data.mobileNumber
+            }
+        });
+        if (existPhoneNum) {
+            res.status(400).json({
+                success: false,
+                message: "Phone number already exists"
+            });
             return;
         }
         yield prisma.user.create({
@@ -63,11 +75,11 @@ otpRouter.post('/send-otp', (req, res) => __awaiter(void 0, void 0, void 0, func
         console.error(error);
     }
 }));
-//@ts-ignore
 otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     const verifyOtpData = verifyOtpSchema.safeParse(req.body);
     if (!verifyOtpData.success) {
-        return res.status(400).send(verifyOtpData.error.errors);
+        res.status(400).send(verifyOtpData.error.errors);
+        return;
     }
     const otpData = yield prisma.otp.findFirst({
         where: {
@@ -77,27 +89,32 @@ otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, fu
     });
     console.log(otpData);
     if (!otpData) {
-        return res.status(400).json({
+        res.status(400).json({
             success: false,
             message: "Invalid OTP"
         });
+        return;
     }
     const accessToken = jsonwebtoken_1.default.sign({ mobileNumber: verifyOtpData.data.mobileNumber }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "100d" });
     if (!accessToken) {
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
             message: "Internal server error"
         });
+        return;
     }
     res.cookie('accessToken', accessToken);
-    console.log("cookie set!");
+    console.log("access token cookie set!");
     const refreshToken = jsonwebtoken_1.default.sign({ mobileNumber: verifyOtpData.data.mobileNumber }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "7d" });
     if (!refreshToken) {
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
             message: "Internal server error"
         });
+        return;
     }
+    res.cookie('refreshToken', refreshToken);
+    console.log("refresh token cookie set!");
     const otpRecord = yield prisma.otp.findFirst({
         where: {
             mobileNumber: verifyOtpData.data.mobileNumber,
@@ -105,16 +122,17 @@ otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, fu
         }
     });
     if (!otpRecord) {
-        return res.status(400).json({
+        res.status(400).json({
             success: false,
             message: "Invalid OTP"
         });
+        return;
     }
-    // await prisma.otp.delete({
-    //     where: {
-    //         id: otpRecord.id
-    //     }
-    // })
+    yield prisma.otp.delete({
+        where: {
+            id: otpRecord.id
+        }
+    });
     yield prisma.user.update({
         where: {
             mobileNumber: verifyOtpData.data.mobileNumber
@@ -131,5 +149,39 @@ otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, fu
         refreshToken,
         accessToken,
         message: "OTP verified successfully"
+    });
+}));
+//@ts-ignore
+otpRouter.get('/refresh-token', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+    var _a;
+    const refreshToken = (_a = req.cookies) === null || _a === void 0 ? void 0 : _a.refreshToken;
+    if (!refreshToken) {
+        return res.status(400).json({
+            success: false,
+            message: "No refresh token found"
+        });
+    }
+    const decodedToken = jsonwebtoken_1.default.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+    const accessToken = jsonwebtoken_1.default.sign({ mobileNumber: decodedToken.mobileNumber }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+    if (!accessToken) {
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+    res.clearCookie('accessToken');
+    res.cookie('accessToken', accessToken);
+    yield prisma.user.update({
+        where: {
+            mobileNumber: decodedToken.mobileNumber
+        },
+        data: {
+            access_Token: accessToken
+        }
+    });
+    res.json({
+        success: true,
+        accessToken,
+        message: "Token refreshed successfully"
     });
 }));

@@ -17,10 +17,13 @@ const userSchema = z.object({
     city: z.string().min(3, "City name cannot be less than 3 characters"),
 })
 const prisma = new PrismaClient();
-//@ts-ignore
+
 userRouter.get('/get-user', async (req: AuthenticatedRequest, res: Response) => {
     const authenticatedUser = req as AuthenticatedRequest
-    if (!authenticatedUser) return res.status(400).json({ message: "The user is not authenticated!" })
+    if (!authenticatedUser) { 
+        res.status(400).json({ message: "The user is not authenticated!" })
+         return
+        }
     const mobileNumber = authenticatedUser.user?.mobileNumber;
     const user = await prisma.user.findUnique({
         where: {
@@ -34,15 +37,18 @@ userRouter.get('/get-user', async (req: AuthenticatedRequest, res: Response) => 
         userName: user?.name,
         mobileNumber: user?.mobileNumber,
         email: user?.email,
-        companyName: user?.company,
+        company: user?.company,
         city: user?.city
 
     })
 });
-//@ts-ignore
+
  userRouter.post("/create-user", async (req: AuthenticatedRequest, res: Response) => {
     const authenticatedUser = req as AuthenticatedRequest
-    if (!authenticatedUser) return res.status(400).json({ message: "The user is not authenticated!" })
+    if (!authenticatedUser) { 
+        res.status(400).json({ message: "The user is not authenticated!" })
+         return
+        }
     const mobileNumber = authenticatedUser.user?.mobileNumber;
     const user = await prisma.user.findUnique({
         where: {
@@ -52,6 +58,10 @@ userRouter.get('/get-user', async (req: AuthenticatedRequest, res: Response) => 
     })
        const userData = userSchema.safeParse(req.body);
         // console.log("UserData",userData)
+        if (!userData.success) {
+            res.status(400).send(userData.error.errors);
+            return;
+        }
     const newUser = await prisma.user.update({
         where:{
             mobileNumber: mobileNumber

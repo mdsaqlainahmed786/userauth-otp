@@ -26,12 +26,13 @@ const userSchema = zod_1.default.object({
     city: zod_1.default.string().min(3, "City name cannot be less than 3 characters"),
 });
 const prisma = new client_1.PrismaClient();
-//@ts-ignore
 userRouter.get('/get-user', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
     const authenticatedUser = req;
-    if (!authenticatedUser)
-        return res.status(400).json({ message: "The user is not authenticated!" });
+    if (!authenticatedUser) {
+        res.status(400).json({ message: "The user is not authenticated!" });
+        return;
+    }
     const mobileNumber = (_a = authenticatedUser.user) === null || _a === void 0 ? void 0 : _a.mobileNumber;
     const user = yield prisma.user.findUnique({
         where: {
@@ -44,16 +45,17 @@ userRouter.get('/get-user', (req, res) => __awaiter(void 0, void 0, void 0, func
         userName: user === null || user === void 0 ? void 0 : user.name,
         mobileNumber: user === null || user === void 0 ? void 0 : user.mobileNumber,
         email: user === null || user === void 0 ? void 0 : user.email,
-        companyName: user === null || user === void 0 ? void 0 : user.company,
+        company: user === null || user === void 0 ? void 0 : user.company,
         city: user === null || user === void 0 ? void 0 : user.city
     });
 }));
-//@ts-ignore
 userRouter.post("/create-user", (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _b, _c, _d, _e, _f;
     const authenticatedUser = req;
-    if (!authenticatedUser)
-        return res.status(400).json({ message: "The user is not authenticated!" });
+    if (!authenticatedUser) {
+        res.status(400).json({ message: "The user is not authenticated!" });
+        return;
+    }
     const mobileNumber = (_b = authenticatedUser.user) === null || _b === void 0 ? void 0 : _b.mobileNumber;
     const user = yield prisma.user.findUnique({
         where: {
@@ -62,6 +64,10 @@ userRouter.post("/create-user", (req, res) => __awaiter(void 0, void 0, void 0, 
     });
     const userData = userSchema.safeParse(req.body);
     // console.log("UserData",userData)
+    if (!userData.success) {
+        res.status(400).send(userData.error.errors);
+        return;
+    }
     const newUser = yield prisma.user.update({
         where: {
             mobileNumber: mobileNumber
