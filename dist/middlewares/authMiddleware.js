@@ -27,13 +27,20 @@ const authMiddleware = (req, res, next) => __awaiter(void 0, void 0, void 0, fun
             return;
         }
         const decodedToken = jsonwebtoken_1.default.verify(authCookie, process.env.ACCESS_TOKEN_SECRET);
+        if (!decodedToken) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized"
+            });
+            return;
+        }
         req.user = decodedToken;
         next();
     }
     catch (error) {
         res.status(401).json({
             success: false,
-            message: error
+            message: "Invalid token or something went wrong"
         });
     }
 });

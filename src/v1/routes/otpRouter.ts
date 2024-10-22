@@ -1,6 +1,7 @@
 import express from 'express';
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import { rateLimit } from 'express-rate-limit'
 import jwt from 'jsonwebtoken';
 import dotenv from 'dotenv';
 import z from 'zod';
@@ -8,6 +9,12 @@ const otpRouter = express.Router();
 dotenv.config();
 otpRouter.use(express.json());
 const prisma = new PrismaClient();
+const limiter = rateLimit({
+	windowMs: 1 * 60 * 1000, 
+	limit: 5,
+	standardHeaders: 'draft-7', 
+	legacyHeaders: false,
+})
 const otpSchema = z.object({
     mobileNumber: z.string().min(10, "mobile number cannot be less than 10 digits").max(10, "mobile number cannot be more than 10 digits"),
     countryCode: z.string().min(2).max(4),
@@ -18,7 +25,7 @@ const verifyOtpSchema = z.object({
     otp: z.string().min(4, "OTP cannot be less than 4 digits").max(4, "OTP cannot be more than 4 digits"),
 })
 
-otpRouter.post('/send-otp', async (req, res) => {
+otpRouter.post('/send-otp', limiter, async (req, res) => {
     try {
         const otpData = otpSchema.safeParse(req.body);
         if (!otpData.success) {
@@ -134,7 +141,7 @@ otpRouter.post('/verify-otp', async (req: Request, res: Response) => {
             access_Token: accessToken
         }
     })
-    console.log("The otp is deleted and the user is updated");
+    //console.log("The otp is deleted and the user is updated");
     // console.log("Token is this>>>>>>", token); ***Token is arriving here***
 
     res.json({
@@ -144,14 +151,15 @@ otpRouter.post('/verify-otp', async (req: Request, res: Response) => {
         message: "OTP verified successfully"
     });
 });
-//@ts-ignore
 otpRouter.get('/refresh-token', async (req, res) => {
+    try{
     const refreshToken = req.cookies?.refreshToken;
     if (!refreshToken) {
-        return res.status(400).json({
+        res.status(400).json({
             success: false,
             message: "No refresh token found"
         });
+        return
     }
     const decodedToken = jwt.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET as string) as {
         mobileNumber: string;
@@ -160,10 +168,11 @@ otpRouter.get('/refresh-token', async (req, res) => {
     };
     const accessToken = jwt.sign({ mobileNumber: decodedToken.mobileNumber }, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "15m" });
     if (!accessToken) {
-        return res.status(500).json({
+        res.status(500).json({
             success: false,
             message: "Internal server error"
         });
+        return
     }
     res.clearCookie('accessToken');
     res.cookie('accessToken', accessToken);
@@ -180,6 +189,13 @@ otpRouter.get('/refresh-token', async (req, res) => {
         accessToken,
         message: "Token refreshed successfully"
     });
+} catch (error) {
+    console.error(error);
+    res.status(500).json({
+        success: false,
+        message: "Internal server error"
+    });
+}
 });
 
 

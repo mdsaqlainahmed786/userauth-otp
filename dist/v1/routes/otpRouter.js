@@ -15,6 +15,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.otpRouter = void 0;
 const express_1 = __importDefault(require("express"));
 const client_1 = require("@prisma/client");
+const express_rate_limit_1 = require("express-rate-limit");
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const dotenv_1 = __importDefault(require("dotenv"));
 const zod_1 = __importDefault(require("zod"));
@@ -23,6 +24,12 @@ exports.otpRouter = otpRouter;
 dotenv_1.default.config();
 otpRouter.use(express_1.default.json());
 const prisma = new client_1.PrismaClient();
+const limiter = (0, express_rate_limit_1.rateLimit)({
+    windowMs: 1 * 60 * 1000,
+    limit: 5,
+    standardHeaders: 'draft-7',
+    legacyHeaders: false,
+});
 const otpSchema = zod_1.default.object({
     mobileNumber: zod_1.default.string().min(10, "mobile number cannot be less than 10 digits").max(10, "mobile number cannot be more than 10 digits"),
     countryCode: zod_1.default.string().min(2).max(4),
@@ -31,7 +38,7 @@ const verifyOtpSchema = zod_1.default.object({
     mobileNumber: zod_1.default.string().min(10, "mobile number cannot be less than 10 digits").max(10, "mobile number cannot be more than 10 digits"),
     otp: zod_1.default.string().min(4, "OTP cannot be less than 4 digits").max(4, "OTP cannot be more than 4 digits"),
 });
-otpRouter.post('/send-otp', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
+otpRouter.post('/send-otp', limiter, (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     try {
         const otpData = otpSchema.safeParse(req.body);
         if (!otpData.success) {
@@ -142,7 +149,7 @@ otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, fu
             access_Token: accessToken
         }
     });
-    console.log("The otp is deleted and the user is updated");
+    //console.log("The otp is deleted and the user is updated");
     // console.log("Token is this>>>>>>", token); ***Token is arriving here***
     res.json({
         success: true,
@@ -151,37 +158,47 @@ otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, fu
         message: "OTP verified successfully"
     });
 }));
-//@ts-ignore
 otpRouter.get('/refresh-token', (req, res) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const refreshToken = (_a = req.cookies) === null || _a === void 0 ? void 0 : _a.refreshToken;
-    if (!refreshToken) {
-        return res.status(400).json({
-            success: false,
-            message: "No refresh token found"
+    try {
+        const refreshToken = (_a = req.cookies) === null || _a === void 0 ? void 0 : _a.refreshToken;
+        if (!refreshToken) {
+            res.status(400).json({
+                success: false,
+                message: "No refresh token found"
+            });
+            return;
+        }
+        const decodedToken = jsonwebtoken_1.default.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
+        const accessToken = jsonwebtoken_1.default.sign({ mobileNumber: decodedToken.mobileNumber }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+        if (!accessToken) {
+            res.status(500).json({
+                success: false,
+                message: "Internal server error"
+            });
+            return;
+        }
+        res.clearCookie('accessToken');
+        res.cookie('accessToken', accessToken);
+        yield prisma.user.update({
+            where: {
+                mobileNumber: decodedToken.mobileNumber
+            },
+            data: {
+                access_Token: accessToken
+            }
+        });
+        res.json({
+            success: true,
+            accessToken,
+            message: "Token refreshed successfully"
         });
     }
-    const decodedToken = jsonwebtoken_1.default.verify(refreshToken, process.env.REFRESH_TOKEN_SECRET);
-    const accessToken = jsonwebtoken_1.default.sign({ mobileNumber: decodedToken.mobileNumber }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
-    if (!accessToken) {
-        return res.status(500).json({
+    catch (error) {
+        console.error(error);
+        res.status(500).json({
             success: false,
             message: "Internal server error"
         });
     }
-    res.clearCookie('accessToken');
-    res.cookie('accessToken', accessToken);
-    yield prisma.user.update({
-        where: {
-            mobileNumber: decodedToken.mobileNumber
-        },
-        data: {
-            access_Token: accessToken
-        }
-    });
-    res.json({
-        success: true,
-        accessToken,
-        message: "Token refreshed successfully"
-    });
 }));

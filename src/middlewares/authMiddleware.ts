@@ -25,12 +25,19 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
       iat: number;
       exp: number;
     };
+    if (!decodedToken) {
+      res.status(401).json({
+        success: false,
+        message: "Unauthorized"
+      })
+      return;
+    }
     req.user = decodedToken
     next();
   } catch (error) {
     res.status(401).json({
       success: false,
-      message: error
+      message: "Invalid token or something went wrong"
     })
   }
     
