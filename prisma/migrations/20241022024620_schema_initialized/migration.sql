@@ -1,0 +1,21 @@
+-- AlterTable
+ALTER TABLE `User` ADD COLUMN `access_Token` VARCHAR(191) NULL,
+    ADD COLUMN `city` VARCHAR(191) NULL,
+    ADD COLUMN `company` VARCHAR(191) NULL,
+    ADD COLUMN `email` VARCHAR(191) NULL,
+    ADD COLUMN `name` VARCHAR(191) NULL,
+    ADD COLUMN `refresh_Token` VARCHAR(191) NULL,
+    MODIFY `mobileNumber` VARCHAR(191) NOT NULL;
+
+-- CreateTable
+CREATE TABLE `Otp` (
+    `id` INTEGER NOT NULL AUTO_INCREMENT,
+    `otp` VARCHAR(191) NOT NULL,
+    `createdAt` DATETIME(3) NOT NULL DEFAULT CURRENT_TIMESTAMP(3),
+    `mobileNumber` VARCHAR(191) NOT NULL,
+
+    PRIMARY KEY (`id`)
+) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
+
+-- AddForeignKey
+ALTER TABLE `Otp` ADD CONSTRAINT `Otp_mobileNumber_fkey` FOREIGN KEY (`mobileNumber`) REFERENCES `User`(`mobileNumber`) ON DELETE RESTRICT ON UPDATE CASCADE;
