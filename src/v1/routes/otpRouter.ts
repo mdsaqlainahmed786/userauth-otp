@@ -1,8 +1,11 @@
 import express from 'express';
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
+import dotenv from 'dotenv';
 import z from 'zod';
 const otpRouter = express.Router();
+dotenv.config();
 otpRouter.use(express.json());
 const prisma = new PrismaClient();
 const otpSchema = z.object({
@@ -35,8 +38,8 @@ otpRouter.post('/send-otp', async (req, res) => {
                 otp: otpString,
             }
         })
-        console.log(otp);
-        console.log(otpData);
+        //  console.log(otp);
+        //  console.log(otpData);
         res.json({
             success: true,
             otp,
@@ -49,30 +52,64 @@ otpRouter.post('/send-otp', async (req, res) => {
 //@ts-ignore
 otpRouter.post('/verify-otp', async (req: Request, res: Response) => {
     const verifyOtpData = verifyOtpSchema.safeParse(req.body);
-    
+
     if (!verifyOtpData.success) {
         return res.status(400).send(verifyOtpData.error.errors);
     }
- 
-    const otp = await prisma.otp.findFirst({
+
+    const otpData = await prisma.otp.findFirst({
         where: {
             mobileNumber: verifyOtpData.data.mobileNumber,
             otp: verifyOtpData.data.otp,
         }
     });
- 
-    if (!otp) {
+
+    if (!otpData) {
         return res.status(400).json({
             success: false,
             message: "Invalid OTP"
         });
     }
- 
+
+    const accessToken = jwt.sign({ mobileNumber: verifyOtpData.data.mobileNumber }, process.env.ACCESS_TOKEN_SECRET as string, { expiresIn: "15m" });
+    if (!accessToken) {
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+    const refreshToken = jwt.sign({ mobileNumber: verifyOtpData.data.mobileNumber }, process.env.REFRESH_TOKEN_SECRET as string, { expiresIn: "7d" })
+    if (!refreshToken) {
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+    await prisma.otp.deleteMany({
+        where: {
+            otp: verifyOtpData.data.otp,
+            mobileNumber: verifyOtpData.data.mobileNumber
+        }
+    })
+    await prisma.user.update({
+        where:{
+            mobileNumber: verifyOtpData.data.mobileNumber
+        },
+        data:{
+            refresh_Token: refreshToken,
+            access_Token: accessToken
+        }
+    })
+    console.log("The otp is deleted and the user is updated");
+    // console.log("Token is this>>>>>>", token); ***Token is arriving here***
+
     res.json({
         success: true,
+        refreshToken,
+        accessToken,
         message: "OTP verified successfully"
     });
- });
+});
 
 
 export { otpRouter };

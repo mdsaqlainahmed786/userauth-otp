@@ -15,9 +15,12 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.otpRouter = void 0;
 const express_1 = __importDefault(require("express"));
 const client_1 = require("@prisma/client");
+const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
+const dotenv_1 = __importDefault(require("dotenv"));
 const zod_1 = __importDefault(require("zod"));
 const otpRouter = express_1.default.Router();
 exports.otpRouter = otpRouter;
+dotenv_1.default.config();
 otpRouter.use(express_1.default.json());
 const prisma = new client_1.PrismaClient();
 const otpSchema = zod_1.default.object({
@@ -48,8 +51,8 @@ otpRouter.post('/send-otp', (req, res) => __awaiter(void 0, void 0, void 0, func
                 otp: otpString,
             }
         });
-        console.log(otp);
-        console.log(otpData);
+        //  console.log(otp);
+        //  console.log(otpData);
         res.json({
             success: true,
             otp,
@@ -66,19 +69,53 @@ otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, fu
     if (!verifyOtpData.success) {
         return res.status(400).send(verifyOtpData.error.errors);
     }
-    const otp = yield prisma.otp.findFirst({
+    const otpData = yield prisma.otp.findFirst({
         where: {
             mobileNumber: verifyOtpData.data.mobileNumber,
             otp: verifyOtpData.data.otp,
         }
     });
-    if (!otp) {
+    if (!otpData) {
         return res.status(400).json({
+            success: false,
             message: "Invalid OTP"
         });
     }
+    const accessToken = jsonwebtoken_1.default.sign({ mobileNumber: verifyOtpData.data.mobileNumber }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+    if (!accessToken) {
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+    const refreshToken = jsonwebtoken_1.default.sign({ mobileNumber: verifyOtpData.data.mobileNumber }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "7d" });
+    if (!refreshToken) {
+        return res.status(500).json({
+            success: false,
+            message: "Internal server error"
+        });
+    }
+    yield prisma.otp.deleteMany({
+        where: {
+            otp: verifyOtpData.data.otp,
+            mobileNumber: verifyOtpData.data.mobileNumber
+        }
+    });
+    yield prisma.user.update({
+        where: {
+            mobileNumber: verifyOtpData.data.mobileNumber
+        },
+        data: {
+            refresh_Token: refreshToken,
+            access_Token: accessToken
+        }
+    });
+    console.log("The otp is deleted and the user is updated");
+    // console.log("Token is this>>>>>>", token); ***Token is arriving here***
     res.json({
         success: true,
+        refreshToken,
+        accessToken,
         message: "OTP verified successfully"
     });
 }));
