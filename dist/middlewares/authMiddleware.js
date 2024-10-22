@@ -16,16 +16,25 @@ exports.authMiddleware = void 0;
 const jsonwebtoken_1 = __importDefault(require("jsonwebtoken"));
 const authMiddleware = (req, res, next) => __awaiter(void 0, void 0, void 0, function* () {
     var _a;
-    const authCookie = (_a = req.cookies) === null || _a === void 0 ? void 0 : _a.accessToken;
-    //  console.log(authCookie)
-    if (!authCookie) {
+    try {
+        const authCookie = (_a = req.cookies) === null || _a === void 0 ? void 0 : _a.accessToken;
+        //  console.log(authCookie)
+        if (!authCookie) {
+            res.status(401).json({
+                success: false,
+                message: "Unauthorized"
+            });
+            return;
+        }
+        const decodedToken = jsonwebtoken_1.default.verify(authCookie, process.env.ACCESS_TOKEN_SECRET);
+        req.user = decodedToken;
+        next();
+    }
+    catch (error) {
         res.status(401).json({
             success: false,
-            message: "Unauthorized"
+            message: error
         });
     }
-    const decodedToken = jsonwebtoken_1.default.verify(authCookie, process.env.ACCESS_TOKEN_SECRET);
-    req.user = decodedToken;
-    next();
 });
 exports.authMiddleware = authMiddleware;
