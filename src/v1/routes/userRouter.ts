@@ -1,9 +1,72 @@
-import express from 'express';
-const userRouter = express.Router();
+import express, { Request, Response, Router } from 'express';
+import { PrismaClient } from '@prisma/client';
+import z from 'zod';
+const userRouter: Router = express.Router();
 userRouter.use(express.json());
+interface AuthenticatedRequest extends Request {
+    user?: {
+        mobileNumber: string;
+        iat: number;
+        exp: number;
+    }
+}
+const userSchema = z.object({
+    name: z.string().min(3, "Name cannot be less than 3 characters"),
+    email: z.string().email("Invalid email"),
+    company: z.string().min(3, "Company name cannot be less than 3 characters"),
+    city: z.string().min(3, "City name cannot be less than 3 characters"),
+})
+const prisma = new PrismaClient();
+//@ts-ignore
+userRouter.get('/get-user', async (req: AuthenticatedRequest, res: Response) => {
+    const authenticatedUser = req as AuthenticatedRequest
+    if (!authenticatedUser) return res.status(400).json({ message: "The user is not authenticated!" })
+    const mobileNumber = authenticatedUser.user?.mobileNumber;
+    const user = await prisma.user.findUnique({
+        where: {
+            mobileNumber: mobileNumber
+        },
 
-userRouter.get('/', (req, res) => {
-    res.json({ message: "User router is working" });
+    })
+    res.status(200).json({
+        success: true,
+        message: "User found successfully",
+        userName: user?.name,
+        mobileNumber: user?.mobileNumber,
+        email: user?.email,
+        companyName: user?.company,
+        city: user?.city
+
+    })
 });
+//@ts-ignore
+ userRouter.post("/create-user", async (req: AuthenticatedRequest, res: Response) => {
+    const authenticatedUser = req as AuthenticatedRequest
+    if (!authenticatedUser) return res.status(400).json({ message: "The user is not authenticated!" })
+    const mobileNumber = authenticatedUser.user?.mobileNumber;
+    const user = await prisma.user.findUnique({
+        where: {
+            mobileNumber: mobileNumber
+        },
 
+    })
+       const userData = userSchema.safeParse(req.body);
+        // console.log("UserData",userData)
+    const newUser = await prisma.user.update({
+        where:{
+            mobileNumber: mobileNumber
+        },
+        data: {
+            name: userData.data?.name,
+            email: userData.data?.email,
+            company: userData.data?.company,
+            city: userData.data?.city
+        }
+    })
+    res.status(200).json({
+        success: true,
+        message:"Profile created successfully",
+        newUser
+    })
+ })
 export { userRouter };

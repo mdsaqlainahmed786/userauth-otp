@@ -1,4 +1,4 @@
-import express, { Request, Response, NextFunction, response } from 'express';
+import express, { Request, Response, NextFunction} from 'express';
 import jwt from 'jsonwebtoken';
 
 interface AuthenticatedRequest extends Request {
