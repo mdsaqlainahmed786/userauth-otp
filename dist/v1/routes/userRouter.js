@@ -9,5 +9,5 @@ const userRouter = express_1.default.Router();
 exports.userRouter = userRouter;
 userRouter.use(express_1.default.json());
 userRouter.get('/', (req, res) => {
-    res.send('This is user route');
+    res.json({ message: "User router is working" });
 });

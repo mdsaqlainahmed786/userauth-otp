@@ -75,19 +75,22 @@ otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, fu
             otp: verifyOtpData.data.otp,
         }
     });
+    console.log(otpData);
     if (!otpData) {
         return res.status(400).json({
             success: false,
             message: "Invalid OTP"
         });
     }
-    const accessToken = jsonwebtoken_1.default.sign({ mobileNumber: verifyOtpData.data.mobileNumber }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "15m" });
+    const accessToken = jsonwebtoken_1.default.sign({ mobileNumber: verifyOtpData.data.mobileNumber }, process.env.ACCESS_TOKEN_SECRET, { expiresIn: "100d" });
     if (!accessToken) {
         return res.status(500).json({
             success: false,
             message: "Internal server error"
         });
     }
+    res.cookie('accessToken', accessToken);
+    console.log("cookie set!");
     const refreshToken = jsonwebtoken_1.default.sign({ mobileNumber: verifyOtpData.data.mobileNumber }, process.env.REFRESH_TOKEN_SECRET, { expiresIn: "7d" });
     if (!refreshToken) {
         return res.status(500).json({
@@ -95,12 +98,23 @@ otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, fu
             message: "Internal server error"
         });
     }
-    yield prisma.otp.deleteMany({
+    const otpRecord = yield prisma.otp.findFirst({
         where: {
+            mobileNumber: verifyOtpData.data.mobileNumber,
             otp: verifyOtpData.data.otp,
-            mobileNumber: verifyOtpData.data.mobileNumber
         }
     });
+    if (!otpRecord) {
+        return res.status(400).json({
+            success: false,
+            message: "Invalid OTP"
+        });
+    }
+    // await prisma.otp.delete({
+    //     where: {
+    //         id: otpRecord.id
+    //     }
+    // })
     yield prisma.user.update({
         where: {
             mobileNumber: verifyOtpData.data.mobileNumber
