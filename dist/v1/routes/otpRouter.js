@@ -80,6 +80,7 @@ otpRouter.post('/send-otp', limiter, (req, res) => __awaiter(void 0, void 0, voi
     }
     catch (error) {
         console.error(error);
+        res.status(500).json({ success: false, message: "Internal server error" });
     }
 }));
 otpRouter.post('/verify-otp', (req, res) => __awaiter(void 0, void 0, void 0, function* () {

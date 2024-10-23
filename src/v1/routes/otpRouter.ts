@@ -25,12 +25,13 @@ const verifyOtpSchema = z.object({
     otp: z.string().min(4, "OTP cannot be less than 4 digits").max(4, "OTP cannot be more than 4 digits"),
 })
 
-otpRouter.post('/send-otp', limiter, async (req, res) => {
+otpRouter.post('/send-otp', limiter, async (req: Request, res: Response) => {
     try {
         const otpData = otpSchema.safeParse(req.body);
         if (!otpData.success) {
-            res.status(400).send(otpData.error.errors);
-            return;
+      res.status(400).send(otpData.error.errors);
+      return;
+         
         }
         const existPhoneNum = await prisma.user.findFirst({
             where: {
@@ -66,6 +67,7 @@ otpRouter.post('/send-otp', limiter, async (req, res) => {
         })
     } catch (error) {
         console.error(error);
+        res.status(500).json({ success: false, message: "Internal server error" });
     }
 });
 
