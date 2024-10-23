@@ -33,7 +33,7 @@
     
  3)  Then create a container by giving it a name and providing a password with port mapping
 
-    docker run --name mysql-db -e MYSQL_ROOT_PASSWORD=pw -p 3306:3306 -d mysql
+         docker run --name mysql-db -e MYSQL_ROOT_PASSWORD=pw -p 3306:3306 -d mysql
 
  4) Once the container is running, run this command
 
