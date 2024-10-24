@@ -27,7 +27,10 @@
 3) Then run `npm run dev` which has dev script of `npx tsc -b && nodemon dist/index.js`
 4) Make sure you have a mySQL data base running using docker or any provider. And update the data_base url
 ## In my case to run the docker mySQL locally we have to run in terminal
- 1) Pull the mysql image from dockerhub
+ 1) Make sure you docker desktop installed
+    https://docs.docker.com/desktop/install/windows-install/
+    
+ 2) Pull the mysql image from dockerhub
 
         docker pull mysql
     
@@ -39,6 +42,6 @@
 
         docker exec -it mysql-project-db mysql -u root -p
     
- 6) Enter the password and then, your mysql data base is now running live locally!
+ 5) Enter the password and then, your mysql data base is now running live locally!
     
 
