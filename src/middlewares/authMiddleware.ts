@@ -1,6 +1,7 @@
 import express, { Request, Response, NextFunction} from 'express';
 import jwt from 'jsonwebtoken';
 
+// Interface for authenticated request
 interface AuthenticatedRequest extends Request {
   user?:{
     mobileNumber: string;
@@ -11,8 +12,8 @@ interface AuthenticatedRequest extends Request {
 
 export const authMiddleware = async (req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> => {
   try {
+    // Getting the access token from the cookies
     const authCookie = req.cookies?.accessToken
-  //  console.log(authCookie)
     if (!authCookie) {
       res.status(401).json({
         success: false,
@@ -20,6 +21,7 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
       })
       return;
     }
+    // Verifying the access token
     const decodedToken = jwt.verify(authCookie, process.env.ACCESS_TOKEN_SECRET as string) as {
       mobileNumber: string;
       iat: number;
@@ -32,6 +34,7 @@ export const authMiddleware = async (req: AuthenticatedRequest, res: Response, n
       })
       return;
     }
+    // Setting the user in the request object
     req.user = decodedToken
     next();
   } catch (error) {
